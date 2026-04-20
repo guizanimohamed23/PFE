@@ -1,0 +1,37 @@
+# Node
+node_modules/
+.env
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+hexstrike-env/
+venv/
+.venv/
+
+# Binary tools (too large for Git)
+**/tools/*.exe
+**/tools/*.bin
+
+# Reports & temp
+hexstrike-ai/reports/
+hexstrike-ai/hexstrike.log
+
+# Database
+*.db
+*.sqlite
+
+# Prisma
+PFE_BACKEND/backend/prisma/*.db
+PFE_BACKEND/backend/prisma/migrations/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

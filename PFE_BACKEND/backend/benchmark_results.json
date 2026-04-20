@@ -1,0 +1,19 @@
+{
+  "target": "http://demo.testfire.net",
+  "stats": {
+    "rawToolFindings": 0,
+    "rawGenericFindings": 2,
+    "rawTotalFindings": 2,
+    "dedupedFindings": 1,
+    "filteredFindings": 1,
+    "droppedFindings": 0
+  },
+  "findings": [
+    {
+      "title": "Detected vulnerability",
+      "severity": "critical",
+      "cveId": null,
+      "evidence_preview": "No description provided by scanner"
+    }
+  ]
+}

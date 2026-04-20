@@ -1,0 +1,128 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 7%;
+    --foreground: 210 20% 92%;
+
+    --card: 220 18% 10%;
+    --card-foreground: 210 20% 92%;
+
+    --popover: 220 18% 10%;
+    --popover-foreground: 210 20% 92%;
+
+    --primary: 185 75% 50%;
+    --primary-foreground: 220 20% 7%;
+
+    --secondary: 220 15% 16%;
+    --secondary-foreground: 210 20% 85%;
+
+    --muted: 220 15% 14%;
+    --muted-foreground: 215 15% 55%;
+
+    --accent: 185 60% 40%;
+    --accent-foreground: 210 20% 95%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 15% 18%;
+    --input: 220 15% 18%;
+    --ring: 185 75% 50%;
+
+    --radius: 0.5rem;
+
+    --severity-critical: 0 85% 55%;
+    --severity-high: 25 95% 55%;
+    --severity-medium: 45 95% 50%;
+    --severity-low: 142 70% 45%;
+
+    --glow-primary: 0 0 20px hsl(185 75% 50% / 0.3);
+    --glow-critical: 0 0 15px hsl(0 85% 55% / 0.4);
+
+    --sidebar-background: 220 18% 10%;
+    --sidebar-foreground: 210 20% 92%;
+    --sidebar-primary: 185 75% 50%;
+    --sidebar-primary-foreground: 220 20% 7%;
+    --sidebar-accent: 220 15% 16%;
+    --sidebar-accent-foreground: 210 20% 85%;
+    --sidebar-border: 220 15% 18%;
+    --sidebar-ring: 185 75% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Inter', system-ui, sans-serif;
+    margin: 0;
+    min-width: 320px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer utilities {
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .glow-primary {
+    box-shadow: var(--glow-primary);
+  }
+
+  .glow-critical {
+    box-shadow: var(--glow-critical);
+  }
+
+  .grid-bg {
+    background-image:
+      linear-gradient(hsl(220 15% 18% / 0.5) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(220 15% 18% / 0.5) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .scan-line {
+    background: linear-gradient(180deg, transparent 0%, hsl(185 75% 50% / 0.03) 50%, transparent 100%);
+    animation: scan 4s ease-in-out infinite;
+  }
+
+  @keyframes scan {
+    0%,
+    100% {
+      transform: translateY(-100%);
+    }
+    50% {
+      transform: translateY(100%);
+    }
+  }
+
+  @keyframes pulse-glow {
+    0%,
+    100% {
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+}

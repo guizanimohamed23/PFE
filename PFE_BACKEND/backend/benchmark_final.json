@@ -1,0 +1,52 @@
+{
+  "findings": [
+    {
+      "tool": "sqlmap",
+      "cveId": null,
+      "title": "sqlmap: [INFO] GET parameter 'cat' IS vulnerable!",
+      "description": "Finding from sqlmap plain text output.",
+      "severity": "critical",
+      "evidence": "[INFO] GET parameter 'cat' IS vulnerable!"
+    },
+    {
+      "tool": "sqlmap",
+      "cveId": "OWASP-2021-A03",
+      "title": "Potential SQL Injection",
+      "description": "SQLMap reported positive SQL injection evidence for the target URL.",
+      "severity": "critical",
+      "evidence": "[INFO] GET parameter 'cat' IS vulnerable!\n[!] Gid=0(root) uid=0(root)\n[synthesized index=1]"
+    },
+    {
+      "tool": "nuclei",
+      "cveId": null,
+      "title": "Cross-Site Scripting (via Nuclei)",
+      "description": "Nuclei detected: xss-detection at http://testphp.vulnweb.com/search.php?test=query",
+      "severity": "medium",
+      "evidence": "http://testphp.vulnweb.com/search.php?test=query"
+    },
+    {
+      "tool": "nikto",
+      "cveId": null,
+      "title": "nikto: + /info.php: Associated with phpinfo() leaking configuration.",
+      "description": "Finding from nikto plain text output.",
+      "severity": "medium",
+      "evidence": "+ /info.php: Associated with phpinfo() leaking configuration."
+    },
+    {
+      "tool": "dirsearch",
+      "cveId": null,
+      "title": "dirsearch: :: [200] http://testphp.vulnweb.com/.git/config",
+      "description": "Finding from dirsearch plain text output.",
+      "severity": "medium",
+      "evidence": ":: [200] http://testphp.vulnweb.com/.git/config"
+    }
+  ],
+  "stats": {
+    "rawToolFindings": 5,
+    "rawGenericFindings": 0,
+    "rawTotalFindings": 5,
+    "dedupedFindings": 5,
+    "filteredFindings": 5,
+    "droppedFindings": 0
+  }
+}

@@ -1,0 +1,347 @@
+﻿{
+    "scan_results":  {
+                         "combined_output":  "\n=== NMAP OUTPUT ===\nStarting Nmap 7.98 ( https://nmap.org ) at 2026-03-21 17:22 +0100\nNmap done: 0 IP addresses (0 hosts up) scanned in 0.17 seconds\n\n==================================================\n\n=== NUCLEI OUTPUT ===\n[\u001b[93mWRN\u001b[0m] Loading 1 unsigned templates for scan. Use with caution.\n\n==================================================\n\n=== SQLMAP OUTPUT ===\n        ___\n       __H__\n ___ ___[\"]_____ ___ ___  {1.10.3.7#dev}\n|_ -| . [\"]     | .\u0027| . |\n|___|_  [\"]_|_|_|__,|  _|\n      |_|V...       |_|   https://sqlmap.org\n\n[!] legal disclaimer: Usage of sqlmap for attacking targets without prior mutual consent is illegal. It is the end user\u0027s responsibility to obey all applicable local, state and federal laws. Developers assume no liability and are not responsible for any misuse or damage caused by this program\n\n[*] starting @ 17:22:01 /2026-03-21/\n\n[17:22:01] [INFO] fetched random HTTP User-Agent header value \u0027Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36\u0027 from file \u0027C:\\Users\\msi\\sqlmap\\data\\txt\\user-agents.txt\u0027\n[17:22:01] [WARNING] you\u0027ve provided target URL without any GET parameters (e.g. \u0027http://www.site.com/article.php?id=1\u0027) and without providing any POST parameters through option \u0027--data\u0027\ndo you want to try URI injections in the target URL itself? [Y/n/q] Y\n[17:22:01] [INFO] testing connection to the target URL\n[17:22:03] [CRITICAL] previous heuristics detected that the target is protected by some kind of WAF/IPS\n[17:22:03] [INFO] testing if the target URL content is stable\n[17:22:04] [INFO] target URL content is stable\n[17:22:04] [INFO] testing if URI parameter \u0027#1*\u0027 is dynamic\ngot a 301 redirect to \u0027https://www.edgenexus.io/fr/\u0027. Do you want to follow? [Y/n] Y\n[17:22:24] [INFO] URI parameter \u0027#1*\u0027 appears to be dynamic\n[17:22:25] [WARNING] potential permission problems detected (\u0027Access Denied\u0027)\n[17:22:25] [WARNING] heuristic (basic) test shows that URI parameter \u0027#1*\u0027 might not be injectable\n[17:22:50] [INFO] testing for SQL injection on URI parameter \u0027#1*\u0027\n[17:22:50] [INFO] testing \u0027AND boolean-based blind - WHERE or HAVING clause\u0027\n\n==================================================\n",
+                         "execution_summary":  {
+                                                   "failed_tools":  2,
+                                                   "success_rate":  60.0,
+                                                   "successful_tools":  3,
+                                                   "tools_used":  [
+                                                                      "nmap",
+                                                                      "nuclei",
+                                                                      "sqlmap"
+                                                                  ],
+                                                   "total_execution_time":  600.5529627799988,
+                                                   "total_tools":  5
+                                               },
+                         "target":  "https://www.edgenexus.io/fr/blog-fr/principales-caracteristiques-de-damn-vulnerable-web-app-dvwa/",
+                         "target_profile":  {
+                                                "attack_surface_score":  7.5,
+                                                "cloud_provider":  null,
+                                                "cms_type":  null,
+                                                "confidence_score":  0.7,
+                                                "endpoints":  [
+
+                                                              ],
+                                                "ip_addresses":  [
+                                                                     "185.43.50.76"
+                                                                 ],
+                                                "open_ports":  [
+
+                                                               ],
+                                                "risk_level":  "high",
+                                                "security_headers":  {
+
+                                                                     },
+                                                "services":  {
+
+                                                             },
+                                                "ssl_info":  {
+
+                                                             },
+                                                "subdomains":  [
+
+                                                               ],
+                                                "target":  "https://www.edgenexus.io/fr/blog-fr/principales-caracteristiques-de-damn-vulnerable-web-app-dvwa/",
+                                                "target_type":  "web_application",
+                                                "technologies":  [
+                                                                     "unknown"
+                                                                 ]
+                                            },
+                         "tools_executed":  [
+                                                {
+                                                    "command":  "",
+                                                    "execution_time":  0.36582446098327637,
+                                                    "parameters":  {
+                                                                       "_optimization_metadata":  {
+                                                                                                      "detected_technologies":  {
+                                                                                                                                    "cms":  [
+
+                                                                                                                                            ],
+                                                                                                                                    "databases":  [
+
+                                                                                                                                                  ],
+                                                                                                                                    "frameworks":  [
+
+                                                                                                                                                   ],
+                                                                                                                                    "languages":  [
+
+                                                                                                                                                  ],
+                                                                                                                                    "security":  [
+
+                                                                                                                                                 ],
+                                                                                                                                    "services":  [
+
+                                                                                                                                                 ],
+                                                                                                                                    "web_servers":  [
+
+                                                                                                                                                    ]
+                                                                                                                                },
+                                                                                                      "optimization_profile":  "normal",
+                                                                                                      "optimizations_applied":  [
+
+                                                                                                                                ],
+                                                                                                      "resource_usage":  {
+                                                                                                                             "cpu_percent":  15.9,
+                                                                                                                             "disk_percent":  93.2,
+                                                                                                                             "memory_percent":  86.2,
+                                                                                                                             "network_bytes_recv":  501235675,
+                                                                                                                             "network_bytes_sent":  60470038,
+                                                                                                                             "timestamp":  1774110637.4514875
+                                                                                                                         },
+                                                                                                      "timestamp":  "2026-03-21T17:30:37.451501"
+                                                                                                  },
+                                                                       "_optimizations_applied":  [
+
+                                                                                                  ],
+                                                                       "additional_args":  "--max-retries 2",
+                                                                       "ports":  "1-1000",
+                                                                       "scan_type":  "-sS -sV",
+                                                                       "target":  "https://www.edgenexus.io/fr/blog-fr/principales-caracteristiques-de-damn-vulnerable-web-app-dvwa/",
+                                                                       "timing":  "-T4"
+                                                                   },
+                                                    "status":  "success",
+                                                    "stderr":  "Unable to split netmask from target expression: \"https://www.edgenexus.io/fr/blog-fr/principales-caracteristiques-de-damn-vulnerable-web-app-dvwa/\"\nWARNING: No targets were specified, so 0 hosts scanned.\n",
+                                                    "stdout":  "Starting Nmap 7.98 ( https://nmap.org ) at 2026-03-21 17:22 +0100\nNmap done: 0 IP addresses (0 hosts up) scanned in 0.17 seconds\n",
+                                                    "success":  true,
+                                                    "timestamp":  "2026-03-21T17:30:37.470951",
+                                                    "tool":  "nmap",
+                                                    "vulnerabilities_found":  0
+                                                },
+                                                {
+                                                    "command":  "",
+                                                    "execution_time":  0.028229236602783203,
+                                                    "parameters":  {
+                                                                       "_optimization_metadata":  {
+                                                                                                      "detected_technologies":  {
+                                                                                                                                    "cms":  [
+
+                                                                                                                                            ],
+                                                                                                                                    "databases":  [
+
+                                                                                                                                                  ],
+                                                                                                                                    "frameworks":  [
+
+                                                                                                                                                   ],
+                                                                                                                                    "languages":  [
+
+                                                                                                                                                  ],
+                                                                                                                                    "security":  [
+
+                                                                                                                                                 ],
+                                                                                                                                    "services":  [
+
+                                                                                                                                                 ],
+                                                                                                                                    "web_servers":  [
+
+                                                                                                                                                    ]
+                                                                                                                                },
+                                                                                                      "optimization_profile":  "normal",
+                                                                                                      "optimizations_applied":  [
+
+                                                                                                                                ],
+                                                                                                      "resource_usage":  {
+                                                                                                                             "cpu_percent":  16.1,
+                                                                                                                             "disk_percent":  93.2,
+                                                                                                                             "memory_percent":  86.2,
+                                                                                                                             "network_bytes_recv":  501248070,
+                                                                                                                             "network_bytes_sent":  60471301,
+                                                                                                                             "timestamp":  1774110637.469914
+                                                                                                                         },
+                                                                                                      "timestamp":  "2026-03-21T17:30:37.469920"
+                                                                                                  },
+                                                                       "_optimizations_applied":  [
+
+                                                                                                  ],
+                                                                       "delay":  "0s",
+                                                                       "mode":  "dir",
+                                                                       "target":  "https://www.edgenexus.io/fr/blog-fr/principales-caracteristiques-de-damn-vulnerable-web-app-dvwa/",
+                                                                       "threads":  20,
+                                                                       "timeout":  "10s",
+                                                                       "wordlist":  "/usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt"
+                                                                   },
+                                                    "status":  "failed",
+                                                    "stderr":  "\u0027gobuster\u0027 n\u0027est pas reconnu en tant que commande interne\nou externe, un programme ex‚cutable ou un fichier de commandes.\n",
+                                                    "stdout":  "",
+                                                    "success":  false,
+                                                    "timestamp":  "2026-03-21T17:30:37.522911",
+                                                    "tool":  "gobuster",
+                                                    "vulnerabilities_found":  0
+                                                },
+                                                {
+                                                    "command":  "",
+                                                    "execution_time":  300.0547287464142,
+                                                    "parameters":  {
+                                                                       "_optimization_metadata":  {
+                                                                                                      "detected_technologies":  {
+                                                                                                                                    "cms":  [
+
+                                                                                                                                            ],
+                                                                                                                                    "databases":  [
+
+                                                                                                                                                  ],
+                                                                                                                                    "frameworks":  [
+
+                                                                                                                                                   ],
+                                                                                                                                    "languages":  [
+
+                                                                                                                                                  ],
+                                                                                                                                    "security":  [
+
+                                                                                                                                                 ],
+                                                                                                                                    "services":  [
+
+                                                                                                                                                 ],
+                                                                                                                                    "web_servers":  [
+
+                                                                                                                                                    ]
+                                                                                                                                },
+                                                                                                      "optimization_profile":  "normal",
+                                                                                                      "optimizations_applied":  [
+
+                                                                                                                                ],
+                                                                                                      "resource_usage":  {
+                                                                                                                             "cpu_percent":  15.8,
+                                                                                                                             "disk_percent":  93.2,
+                                                                                                                             "memory_percent":  86.2,
+                                                                                                                             "network_bytes_recv":  501240091,
+                                                                                                                             "network_bytes_sent":  60471031,
+                                                                                                                             "timestamp":  1774110637.4565156
+                                                                                                                         },
+                                                                                                      "timestamp":  "2026-03-21T17:30:37.456523"
+                                                                                                  },
+                                                                       "_optimizations_applied":  [
+
+                                                                                                  ],
+                                                                       "severity":  "critical,high,medium",
+                                                                       "target":  "https://www.edgenexus.io/fr/blog-fr/principales-caracteristiques-de-damn-vulnerable-web-app-dvwa/",
+                                                                       "threads":  25
+                                                                   },
+                                                    "status":  "success",
+                                                    "stderr":  "\n                     __     _\n   ____  __  _______/ /__  (_)\n  / __ \\/ / / / ___/ / _ \\/ /\n / / / / /_/ / /__/ /  __/ /\n/_/ /_/\\__,_/\\___/_/\\___/_/   v3.7.1\n\n\t\tprojectdiscovery.io\n\n[\u001b[31mWRN\u001b[0m] Found 3 templates with runtime error (use -validate flag for further examination)\n[\u001b[34mINF\u001b[0m] Current nuclei version: v3.7.1 (\u001b[92mlatest\u001b[0m)\n[\u001b[34mINF\u001b[0m] Current nuclei-templates version: v10.4.0 (\u001b[92mlatest\u001b[0m)\n[\u001b[34mINF\u001b[0m] New templates added in latest release: 94\n[\u001b[34mINF\u001b[0m] Templates loaded for current scan: 5931\n[\u001b[34mINF\u001b[0m] Executing 5930 signed templates from projectdiscovery/nuclei-templates\n[\u001b[34mINF\u001b[0m] Targets loaded for current scan: 1\n[\u001b[34mINF\u001b[0m] Templates clustered: 349 (Reduced 296 Requests)\n[\u001b[34mINF\u001b[0m] Using Interactsh Server: oast.pro\n",
+                                                    "stdout":  "[\u001b[93mWRN\u001b[0m] Loading 1 unsigned templates for scan. Use with caution.\n",
+                                                    "success":  true,
+                                                    "timestamp":  "2026-03-21T17:30:37.471909",
+                                                    "tool":  "nuclei",
+                                                    "vulnerabilities_found":  0
+                                                },
+                                                {
+                                                    "command":  "",
+                                                    "execution_time":  0.03104233741760254,
+                                                    "parameters":  {
+                                                                       "_optimization_metadata":  {
+                                                                                                      "detected_technologies":  {
+                                                                                                                                    "cms":  [
+
+                                                                                                                                            ],
+                                                                                                                                    "databases":  [
+
+                                                                                                                                                  ],
+                                                                                                                                    "frameworks":  [
+
+                                                                                                                                                   ],
+                                                                                                                                    "languages":  [
+
+                                                                                                                                                  ],
+                                                                                                                                    "security":  [
+
+                                                                                                                                                 ],
+                                                                                                                                    "services":  [
+
+                                                                                                                                                 ],
+                                                                                                                                    "web_servers":  [
+
+                                                                                                                                                    ]
+                                                                                                                                },
+                                                                                                      "optimization_profile":  "normal",
+                                                                                                      "optimizations_applied":  [
+
+                                                                                                                                ],
+                                                                                                      "resource_usage":  {
+                                                                                                                             "cpu_percent":  16.1,
+                                                                                                                             "disk_percent":  93.2,
+                                                                                                                             "memory_percent":  86.2,
+                                                                                                                             "network_bytes_recv":  501243708,
+                                                                                                                             "network_bytes_sent":  60471139,
+                                                                                                                             "timestamp":  1774110637.4658804
+                                                                                                                         },
+                                                                                                      "timestamp":  "2026-03-21T17:30:37.465884"
+                                                                                                  },
+                                                                       "_optimizations_applied":  [
+
+                                                                                                  ],
+                                                                       "target":  "https://www.edgenexus.io/fr/blog-fr/principales-caracteristiques-de-damn-vulnerable-web-app-dvwa/"
+                                                                   },
+                                                    "status":  "failed",
+                                                    "stderr":  "\u0027nikto\u0027 n\u0027est pas reconnu en tant que commande interne\nou externe, un programme ex‚cutable ou un fichier de commandes.\n",
+                                                    "stdout":  "",
+                                                    "success":  false,
+                                                    "timestamp":  "2026-03-21T17:30:37.524778",
+                                                    "tool":  "nikto",
+                                                    "vulnerabilities_found":  0
+                                                },
+                                                {
+                                                    "command":  "",
+                                                    "execution_time":  300.07313799858093,
+                                                    "parameters":  {
+                                                                       "_optimization_metadata":  {
+                                                                                                      "detected_technologies":  {
+                                                                                                                                    "cms":  [
+
+                                                                                                                                            ],
+                                                                                                                                    "databases":  [
+
+                                                                                                                                                  ],
+                                                                                                                                    "frameworks":  [
+
+                                                                                                                                                   ],
+                                                                                                                                    "languages":  [
+
+                                                                                                                                                  ],
+                                                                                                                                    "security":  [
+
+                                                                                                                                                 ],
+                                                                                                                                    "services":  [
+
+                                                                                                                                                 ],
+                                                                                                                                    "web_servers":  [
+
+                                                                                                                                                    ]
+                                                                                                                                },
+                                                                                                      "optimization_profile":  "normal",
+                                                                                                      "optimizations_applied":  [
+
+                                                                                                                                ],
+                                                                                                      "resource_usage":  {
+                                                                                                                             "cpu_percent":  15.8,
+                                                                                                                             "disk_percent":  93.2,
+                                                                                                                             "memory_percent":  86.2,
+                                                                                                                             "network_bytes_recv":  501242254,
+                                                                                                                             "network_bytes_sent":  60471031,
+                                                                                                                             "timestamp":  1774110637.461365
+                                                                                                                         },
+                                                                                                      "timestamp":  "2026-03-21T17:30:37.461371"
+                                                                                                  },
+                                                                       "_optimizations_applied":  [
+
+                                                                                                  ],
+                                                                       "batch":  true,
+                                                                       "delay":  0,
+                                                                       "level":  2,
+                                                                       "risk":  2,
+                                                                       "target":  "https://www.edgenexus.io/fr/blog-fr/principales-caracteristiques-de-damn-vulnerable-web-app-dvwa/",
+                                                                       "threads":  5
+                                                                   },
+                                                    "status":  "success",
+                                                    "stderr":  "",
+                                                    "stdout":  "        ___\n       __H__\n ___ ___[\"]_____ ___ ___  {1.10.3.7#dev}\n|_ -| . [\"]     | .\u0027| . |\n|___|_  [\"]_|_|_|__,|  _|\n      |_|V...       |_|   https://sqlmap.org\n\n[!] legal disclaimer: Usage of sqlmap for attacking targets without prior mutual consent is illegal. It is the end user\u0027s responsibility to obey all applicable local, state and federal laws. Developers assume no liability and are not responsible for any misuse or damage caused by this program\n\n[*] starting @ 17:22:01 /2026-03-21/\n\n[17:22:01] [INFO] fetched random HTTP User-Agent header value \u0027Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36\u0027 from file \u0027C:\\Users\\msi\\sqlmap\\data\\txt\\user-agents.txt\u0027\n[17:22:01] [WARNING] you\u0027ve provided target URL without any GET parameters (e.g. \u0027http://www.site.com/article.php?id=1\u0027) and without providing any POST parameters through option \u0027--data\u0027\ndo you want to try URI injections in the target URL itself? [Y/n/q] Y\n[17:22:01] [INFO] testing connection to the target URL\n[17:22:03] [CRITICAL] previous heuristics detected that the target is protected by some kind of WAF/IPS\n[17:22:03] [INFO] testing if the target URL content is stable\n[17:22:04] [INFO] target URL content is stable\n[17:22:04] [INFO] testing if URI parameter \u0027#1*\u0027 is dynamic\ngot a 301 redirect to \u0027https://www.edgenexus.io/fr/\u0027. Do you want to follow? [Y/n] Y\n[17:22:24] [INFO] URI parameter \u0027#1*\u0027 appears to be dynamic\n[17:22:25] [WARNING] potential permission problems detected (\u0027Access Denied\u0027)\n[17:22:25] [WARNING] heuristic (basic) test shows that URI parameter \u0027#1*\u0027 might not be injectable\n[17:22:50] [INFO] testing for SQL injection on URI parameter \u0027#1*\u0027\n[17:22:50] [INFO] testing \u0027AND boolean-based blind - WHERE or HAVING clause\u0027\n",
+                                                    "success":  true,
+                                                    "timestamp":  "2026-03-21T17:30:37.472750",
+                                                    "tool":  "sqlmap",
+                                                    "vulnerabilities_found":  2
+                                                }
+                                            ],
+                         "total_vulnerabilities":  2
+                     },
+    "success":  true,
+    "timestamp":  "2026-03-21T17:30:37.527262"
+}
