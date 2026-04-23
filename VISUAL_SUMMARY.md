@@ -95,13 +95,11 @@ SPRINT 5 (Weeks 14-16)
 
 ## 📊 Report Growth Timeline
 
-```
-Sprint 1 (Week 1-3)    ████████░░░░░░░░░░░░░░░░░  40-50 pages
-Sprint 2 (Week 4-6)    ███████████░░░░░░░░░░░░░░░░ 60-75 pages
-Sprint 3 (Week 7-9)    ████████████░░░░░░░░░░░░░░░ 80-95 pages
-Sprint 4 (Week 10-13)  ████████████████░░░░░░░░░░░ 110-130 pages
-Sprint 5 (Week 14-16)  ██████████████████░░░░░░░░░ 140-160 pages ✅
-
+Sprint 1	Weeks 1–3	Research, environment setup, backend foundation
+Sprint 2	Weeks 4–6	Backend services, API integration, authentication
+Sprint 3	Weeks 7–9	Frontend development, AI integration
+Sprint 4	Weeks 10–13	Visualization, optimization, feature enhancement
+Sprint 5	Weeks 14–16	Testing, deployment, finalization
 Target: 160+ pages with figures, screenshots, and appendices
 ```
 

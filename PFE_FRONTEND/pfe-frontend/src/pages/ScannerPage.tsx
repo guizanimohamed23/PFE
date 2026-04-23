@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { createScan } from '../api/scanApi'
 import { HttpError } from '../api/httpClient'
-import type { ScanMode, ScanResponse } from '../types/scan'
+import type { ScanMode, ScanResponse, TargetProfile } from '../types/scan'
 
 function formatDateTime(value: string): string {
   if (!value) {
@@ -62,6 +62,183 @@ function ScanSummary({ scan }: { scan: ScanResponse }) {
           <span className="text-muted-foreground">Matched Findings:</span> {scan.scanMeta.matchedFindings}
         </p>
       </div>
+    </div>
+  )
+}
+
+function riskColor(level: string): string {
+  const l = level.toLowerCase()
+  if (l === 'critical') return 'text-red-400 border-red-500/40 bg-red-500/10'
+  if (l === 'high') return 'text-orange-400 border-orange-500/40 bg-orange-500/10'
+  if (l === 'medium') return 'text-yellow-400 border-yellow-500/40 bg-yellow-500/10'
+  if (l === 'low') return 'text-green-400 border-green-500/40 bg-green-500/10'
+  return 'text-muted-foreground border-border bg-secondary'
+}
+
+function scoreBar(score: number): string {
+  const pct = Math.min(100, Math.max(0, score * 10))
+  if (pct >= 80) return 'bg-red-500'
+  if (pct >= 50) return 'bg-orange-400'
+  if (pct >= 30) return 'bg-yellow-400'
+  return 'bg-green-500'
+}
+
+function TargetProfileCard({ profile }: { profile: TargetProfile }) {
+  const riskCls = riskColor(profile.risk_level)
+  const attackPct = Math.min(100, Math.max(0, profile.attack_surface_score * 10))
+  const confidencePct = Math.min(100, Math.max(0, profile.confidence_score * 100))
+  const headerEntries = Object.entries(profile.security_headers)
+  const sslEntries = Object.entries(profile.ssl_info)
+  const serviceEntries = Object.entries(profile.services)
+
+  return (
+    <div className="rounded-md border border-border bg-secondary p-4 text-sm space-y-4">
+      {/* Header row */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="font-semibold text-base">🎯 Target Profile</h3>
+        <span className={`rounded border px-2 py-0.5 text-xs font-semibold uppercase ${riskCls}`}>
+          {profile.risk_level} risk
+        </span>
+      </div>
+
+      {/* Identity row */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">Target Type</p>
+          <p className="font-mono text-xs bg-background/60 rounded px-2 py-1">{profile.target_type}</p>
+        </div>
+        {profile.ip_addresses.length > 0 && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">IP Addresses</p>
+            <p className="font-mono text-xs bg-background/60 rounded px-2 py-1">{profile.ip_addresses.join(', ')}</p>
+          </div>
+        )}
+        {profile.cms_type && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">CMS</p>
+            <p className="font-mono text-xs bg-background/60 rounded px-2 py-1">{profile.cms_type}</p>
+          </div>
+        )}
+        {profile.cloud_provider && (
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Cloud Provider</p>
+            <p className="font-mono text-xs bg-background/60 rounded px-2 py-1">{profile.cloud_provider}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Attack surface + confidence scores */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-muted-foreground">Attack Surface Score</p>
+            <span className="text-xs font-semibold">{profile.attack_surface_score.toFixed(1)} / 10</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-border overflow-hidden">
+            <div className={`h-full rounded-full transition-all ${scoreBar(profile.attack_surface_score)}`} style={{ width: `${attackPct}%` }} />
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-muted-foreground">Confidence Score</p>
+            <span className="text-xs font-semibold">{(confidencePct).toFixed(0)}%</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-border overflow-hidden">
+            <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${confidencePct}%` }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Technologies */}
+      {profile.technologies.length > 0 && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Detected Technologies</p>
+          <div className="flex flex-wrap gap-1.5">
+            {profile.technologies.map((tech) => (
+              <span key={tech} className="rounded border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary font-mono">
+                {tech}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Open ports + services */}
+      {profile.open_ports.length > 0 && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Open Ports / Services</p>
+          <div className="flex flex-wrap gap-1.5">
+            {profile.open_ports.map((port) => (
+              <span key={port} className="rounded border border-border bg-background/60 px-2 py-0.5 text-xs font-mono">
+                {port}{serviceEntries.find(([k]) => k === String(port)) ? ` (${serviceEntries.find(([k]) => k === String(port))![1]})` : ''}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Security Headers */}
+      {headerEntries.length > 0 && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Security Headers</p>
+          <div className="space-y-1">
+            {headerEntries.slice(0, 8).map(([key, val]) => (
+              <div key={key} className="flex gap-2 text-xs font-mono">
+                <span className="text-muted-foreground shrink-0">{key}:</span>
+                <span className="truncate text-foreground/80">{String(val)}</span>
+              </div>
+            ))}
+            {headerEntries.length > 8 && (
+              <p className="text-xs text-muted-foreground">+{headerEntries.length - 8} more headers</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SSL Info */}
+      {sslEntries.length > 0 && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">SSL / TLS Info</p>
+          <div className="grid gap-1 sm:grid-cols-2">
+            {sslEntries.slice(0, 6).map(([key, val]) => (
+              <div key={key} className="flex gap-2 text-xs font-mono">
+                <span className="text-muted-foreground shrink-0">{key}:</span>
+                <span className="truncate">{String(val)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Subdomains */}
+      {profile.subdomains.length > 0 && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Subdomains ({profile.subdomains.length})</p>
+          <div className="flex flex-wrap gap-1.5">
+            {profile.subdomains.slice(0, 10).map((sub) => (
+              <span key={sub} className="rounded border border-border bg-background/60 px-2 py-0.5 text-xs font-mono">{sub}</span>
+            ))}
+            {profile.subdomains.length > 10 && (
+              <span className="text-xs text-muted-foreground">+{profile.subdomains.length - 10} more</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Discovered endpoints */}
+      {profile.endpoints.length > 0 && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Discovered Endpoints ({profile.endpoints.length})</p>
+          <div className="max-h-32 overflow-y-auto space-y-0.5 rounded border border-border bg-background/60 p-2">
+            {profile.endpoints.slice(0, 30).map((ep) => (
+              <p key={ep} className="font-mono text-xs text-foreground/70 truncate">{ep}</p>
+            ))}
+            {profile.endpoints.length > 30 && (
+              <p className="text-xs text-muted-foreground">+{profile.endpoints.length - 30} more endpoints</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -248,6 +425,10 @@ export default function ScannerPage() {
             </div>
 
             <ScanSummary scan={latestScan} />
+
+            {latestScan.targetProfile && (
+              <TargetProfileCard profile={latestScan.targetProfile} />
+            )}
 
             {latestScan.scanState === 'completed' && (
               <>
