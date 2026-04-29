@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import {
   Background,
   Controls,
@@ -27,78 +27,39 @@ import { type AiGenerateRequest, type AttackGraphNodeData, type Severity } from 
 type AttackNode = Node<AttackGraphNodeData, 'attackStep'>
 type AttackEdge = Edge
 
-const severityClasses: Record<Severity, string> = {
-  Critical: 'bg-severity-critical/20 text-severity-critical border-severity-critical/40',
-  High: 'bg-severity-high/20 text-severity-high border-severity-high/40',
-  Medium: 'bg-severity-medium/20 text-severity-medium border-severity-medium/40',
-  Low: 'bg-severity-low/20 text-severity-low border-severity-low/40',
-}
-
-const severityBorderClasses: Record<Severity, string> = {
-  Critical: 'border-l-severity-critical',
-  High: 'border-l-severity-high',
-  Medium: 'border-l-severity-medium',
-  Low: 'border-l-severity-low',
-}
-
-function shortText(value: string, maxLength = 75): string {
-  return value.length <= maxLength ? value : `${value.slice(0, maxLength).trimEnd()}…`
-}
-
-function withFallbackPosition(nodes: NormalizedScenario['graph']['nodes']): AttackNode[] {
-  return nodes.map((node, index) => ({
-    id: node.id,
-    type: 'attackStep',
-    data: node.data,
-    position: node.position ?? {
-      x: 80 + (index % 3) * 300,
-      y: 80 + Math.floor(index / 3) * 190,
-    },
-  }))
-}
-
-function toFlowEdges(edges: NormalizedScenario['graph']['edges']): AttackEdge[] {
-  return edges.map((edge) => ({
-    ...edge,
-    type: 'smoothstep',
-    markerEnd: {
-      type: 'arrowclosed',
-      color: 'hsl(var(--primary))',
-    },
-    style: {
-      stroke: 'hsl(var(--primary))',
-    },
-  }))
+const severityMap: Record<Severity | string, { label: string; cls: string }> = {
+  Critical: { label: 'CRITICAL', cls: 'bg-red-500/10 text-red-500 border-red-500/30' },
+  High: { label: 'HIGH', cls: 'bg-orange-500/10 text-orange-500 border-orange-500/30' },
+  Medium: { label: 'MEDIUM', cls: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/30' },
+  Low: { label: 'LOW', cls: 'bg-blue-500/10 text-blue-500 border-blue-500/30' },
 }
 
 function AttackStepNode({ data, selected }: NodeProps<AttackNode>) {
+  const sev = severityMap[data.severity] || severityMap.Medium
   return (
-    <div
-      className={`min-w-64 max-w-72 rounded-md border border-border bg-card p-3 shadow-lg border-l-4 ${severityBorderClasses[data.severity]} ${
-        selected ? 'ring-2 ring-primary' : ''
-      }`}
-    >
-      <Handle type="target" position={Position.Top} className="!bg-primary" />
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="font-mono text-xs text-muted-foreground">STEP {data.stepNumber}</span>
-        <span className={`rounded border px-2 py-0.5 text-xs font-semibold ${severityClasses[data.severity]}`}>
-          {data.severity}
-        </span>
+    <div className={`relative transition-all duration-300 ${selected ? 'scale-105' : ''}`}>
+      <Handle type="target" position={Position.Top} className="!bg-primary !w-2 !h-2 !border-none" />
+      <div className={`bg-[#11141d]/90 backdrop-blur-md border-2 rounded-lg p-5 min-w-[280px] shadow-2xl ${
+        selected ? 'border-primary ring-4 ring-primary/10' : 'border-white/5'
+      }`}>
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">Step 0{data.stepNumber}</span>
+          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${sev.cls}`}>{sev.label}</span>
+        </div>
+        <h3 className="text-sm font-bold text-white mb-2 leading-tight uppercase tracking-tight">{data.title}</h3>
+        <p className="text-[10px] text-primary/70 font-mono mb-3 uppercase tracking-tighter">MITRE_ID: {data.mitreId || 'T1059'}</p>
+        <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">{data.description}</p>
       </div>
-      <h3 className="font-mono text-sm text-foreground">{data.title}</h3>
-      <p className="mt-1 font-mono text-xs text-primary">MITRE: {data.techniqueId}</p>
-      <p className="mt-2 text-xs text-muted-foreground">{shortText(data.description)}</p>
-      <Handle type="source" position={Position.Bottom} className="!bg-primary" />
+      <Handle type="source" position={Position.Bottom} className="!bg-primary !w-2 !h-2 !border-none" />
     </div>
   )
 }
 
-const nodeTypes = {
-  attackStep: AttackStepNode,
-}
+const nodeTypes = { attackStep: AttackStepNode }
 
 export default function App() {
   const { user, logout } = useAuth()
+  const location = useLocation()
   const [selectedVulnerabilityId, setSelectedVulnerabilityId] = useState<number | null>(null)
   const [selectedStepNodeId, setSelectedStepNodeId] = useState<string | null>(null)
   const [scenario, setScenario] = useState<NormalizedScenario | null>(null)
@@ -115,226 +76,217 @@ export default function App() {
     mutationFn: (payload: AiGenerateRequest) => generateAttackScenario(payload),
     onSuccess: (payload) => {
       const normalized = normalizeScenarioPayload(payload)
-      const flowNodes = withFallbackPosition(normalized.graph.nodes)
-
+      const flowNodes = normalized.graph.nodes.map((node, i) => ({
+        ...node,
+        type: 'attackStep',
+        position: node.position ?? { x: 100 + (i % 2) * 350, y: 100 + Math.floor(i / 2) * 250 }
+      }))
       setScenario(normalized)
       setNodes(flowNodes)
-      setEdges(toFlowEdges(normalized.graph.edges))
-      setSelectedStepNodeId(flowNodes[0]?.id ?? null)
+      setEdges(normalized.graph.edges.map(edge => ({
+        ...edge,
+        animated: true,
+        style: { stroke: 'hsl(var(--primary))', strokeWidth: 2, opacity: 0.4 },
+        markerEnd: { type: 'arrowclosed', color: 'hsl(var(--primary))' }
+      })))
     },
   })
 
-  const selectedStep = useMemo(() => {
-    if (!scenario || !selectedStepNodeId) {
-      return null
-    }
-
-    const byStepId = scenario.steps.find((step) => String(step.step_id) === selectedStepNodeId)
-    if (byStepId) {
-      return {
-        stepNumber: byStepId.step_id,
-        title: byStepId.title,
-        description: byStepId.description,
-        techniqueId: byStepId.mitre_technique,
-        severity: byStepId.severity,
-      }
-    }
-
-    const byNode = scenario.graph.nodes.find((node) => node.id === selectedStepNodeId)
-    return byNode?.data ?? null
-  }, [scenario, selectedStepNodeId])
-
-  const handleGenerate = (vulnerabilityId: number) => {
-    setSelectedVulnerabilityId(vulnerabilityId)
-    generateMutation.mutate({ vulnerabilityId, language: 'en', stepCount: 5 })
-  }
+  const selectedNode = useMemo(() => nodes.find(n => n.id === selectedStepNodeId), [nodes, selectedStepNodeId])
 
   return (
-    <main className="grid-bg min-h-screen bg-background text-foreground">
-      <div className="mx-auto grid min-h-screen w-full max-w-[1600px] grid-cols-12 gap-4 p-4">
-        <aside className="col-span-3 rounded-lg border border-border bg-card/95 p-4">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <h1 className="text-lg font-semibold">Red Team Attack Paths</h1>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Link
-                  to="/scanner"
-                  className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary"
-                >
-                  Scanner
-                </Link>
-                <Link
-                  to="/scans"
-                  className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary"
-                >
-                  Scan History
-                </Link>
-              </div>
-              {user ? (
-                <div className="mt-1 space-y-1">
-                  <p className="text-xs text-muted-foreground">{user.fullName}</p>
-                  <p className="text-xs text-muted-foreground">{user.email}</p>
-                  {user.isGuest ? (
-                    <span className="inline-flex rounded border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
-                      Guest Session
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-            <button
-              type="button"
-              onClick={logout}
-              className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary"
-            >
-              Logout
-            </button>
-          </div>
-
-          <h2 className="mb-2 text-sm font-semibold text-muted-foreground">Vulnerabilities</h2>
-          {vulnerabilitiesQuery.isLoading && <p className="text-sm text-muted-foreground">Loading vulnerabilities...</p>}
-
-          {vulnerabilitiesQuery.isError && (
-            <div className="rounded border border-destructive/50 bg-destructive/10 p-3 text-sm">
-              <p>Unable to load vulnerabilities.</p>
-              <button
-                type="button"
-                onClick={() => vulnerabilitiesQuery.refetch()}
-                className="mt-2 rounded border border-destructive/60 px-2 py-1 text-xs"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-
-          {!vulnerabilitiesQuery.isLoading && vulnerabilitiesQuery.data?.length === 0 && (
-            <p className="text-sm text-muted-foreground">No vulnerabilities available.</p>
-          )}
-
-          <div className="space-y-2">
-            {vulnerabilitiesQuery.data?.map((vulnerability) => (
-              <button
-                key={vulnerability.id}
-                type="button"
-                onClick={() => handleGenerate(vulnerability.id)}
-                className={`w-full rounded-md border p-3 text-left transition-colors ${
-                  selectedVulnerabilityId === vulnerability.id
-                    ? 'border-primary bg-primary/10 glow-primary'
-                    : 'border-border bg-secondary hover:border-primary/40'
+    <div className="h-screen flex flex-col bg-[#0B0F14] text-foreground font-sans overflow-hidden">
+      {/* ── Header ── */}
+      <header className="h-16 border-b border-white/5 flex items-center justify-between px-8 bg-[#0B0F14] z-50">
+        <div className="flex items-center gap-12">
+          <Link to="/" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 rounded bg-primary flex items-center justify-center text-primary-foreground font-black text-xs">HX</div>
+            <span className="text-sm font-bold tracking-tight uppercase">HexStrike <span className="text-primary/40 italic">CORE</span></span>
+          </Link>
+          <nav className="flex gap-2">
+            {[
+              { label: 'Attack Paths', path: '/' },
+              { label: 'Scanner', path: '/scanner' },
+              { label: 'History', path: '/scans' },
+            ].map(item => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] transition-all rounded ${
+                  location.pathname === item.path ? 'bg-primary/10 text-primary border border-primary/20' : 'text-muted-foreground hover:text-white'
                 }`}
               >
-                <p className="font-mono text-xs text-primary">{vulnerability.cveId}</p>
-                <p className="mt-1 text-sm font-semibold">{vulnerability.title}</p>
-                <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                  <span className={`rounded border px-2 py-0.5 ${severityClasses[vulnerability.severity]}`}>
-                    {vulnerability.severity}
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+        <div className="flex items-center gap-6">
+          <div className="text-right">
+            <p className="text-[11px] font-bold text-white uppercase tracking-tighter">{user?.fullName || 'Mohamed Guizani'}</p>
+            <p className="text-[9px] font-mono text-muted-foreground uppercase opacity-60 tracking-widest">Connected_Uplink</p>
+          </div>
+          <button onClick={logout} className="p-2.5 rounded border border-white/5 bg-white/2 hover:bg-red-500/10 hover:text-red-500 transition-all text-xs">⏻</button>
+        </div>
+      </header>
+
+      <main className="flex-1 flex overflow-hidden relative">
+        
+        {/* ── Left Sidebar (Threat Inventory) ── */}
+        <aside className={`transition-all duration-700 ease-in-out border-r border-white/5 bg-[#0D1117] flex flex-col z-20 ${
+          selectedVulnerabilityId ? 'w-[340px]' : 'w-full'
+        }`}>
+          <div className="p-8 pb-4 flex justify-between items-center">
+            <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Threat_Inventory</h2>
+            {!selectedVulnerabilityId && (
+              <span className="text-[9px] font-bold text-primary bg-primary/5 px-2 py-1 rounded border border-primary/20 animate-pulse">Select_Primary_Target</span>
+            )}
+          </div>
+          
+          <div className={`flex-1 overflow-y-auto p-8 pt-4 sidebar-scroll transition-all duration-500 ${
+            selectedVulnerabilityId ? 'grid grid-cols-1 gap-4' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
+          }`}>
+            {vulnerabilitiesQuery.data?.map(v => (
+              <button
+                key={v.id}
+                onClick={() => {
+                  setSelectedVulnerabilityId(v.id)
+                  generateMutation.mutate({ vulnerabilityId: v.id, language: 'en', stepCount: 5 })
+                }}
+                className={`w-full text-left p-6 rounded-lg border-2 transition-all duration-500 group relative ${
+                  selectedVulnerabilityId === v.id 
+                  ? 'bg-primary/5 border-primary shadow-[0_0_30px_rgba(0,255,255,0.08)] scale-102 z-10' 
+                  : 'bg-white/2 border-white/5 hover:border-white/10 hover:bg-white/4'
+                }`}
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <span className="text-[10px] font-mono text-primary font-black uppercase tracking-widest">{v.cveId || 'THREAT'}</span>
+                  <span className="text-[10px] font-black text-muted-foreground tracking-tighter opacity-60">CVSS {v.cvssScore?.toFixed(1) || 'N/A'}</span>
+                </div>
+                <h3 className="text-[13px] font-black text-white mb-6 uppercase leading-tight group-hover:text-primary transition-colors line-clamp-2">{v.title}</h3>
+                <div className="flex justify-between items-end">
+                  <span className={`text-[9px] font-black px-2 py-0.5 rounded border uppercase ${
+                    v.severity === 'Critical' ? 'border-red-500/40 text-red-500 bg-red-500/5' : 'border-primary/40 text-primary bg-primary/5'
+                  }`}>
+                    {v.severity}
                   </span>
-                  <span>CVSS {vulnerability.cvssScore ? vulnerability.cvssScore.toFixed(1) : 'N/A'}</span>
+                  {selectedVulnerabilityId === v.id && (
+                    <span className="text-[8px] font-black text-primary animate-pulse tracking-tighter">SELECTED</span>
+                  )}
                 </div>
               </button>
             ))}
           </div>
         </aside>
 
-        <section className="col-span-6 overflow-hidden rounded-lg border border-border bg-card/80">
-          {!selectedVulnerabilityId && (
-            <div className="flex h-full min-h-[70vh] items-center justify-center p-6 text-center text-muted-foreground">
-              Select a vulnerability to generate an AI attack path.
+        {/* ── Center Canvas ── */}
+        <section className={`transition-all duration-700 ease-in-out relative bg-[#0B0F14] dot-grid flex flex-col ${
+          selectedVulnerabilityId ? 'flex-1 translate-x-0 opacity-100' : 'w-0 translate-x-12 opacity-0'
+        }`}>
+          {generateMutation.isPending && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0B0F14]/90 backdrop-blur-md">
+              <div className="w-12 h-12 border-2 border-primary/20 border-t-primary rounded-full animate-spin mb-6" />
+              <span className="text-[10px] font-black text-primary tracking-[0.5em] uppercase animate-pulse">Synthesizing_Attack_Path</span>
             </div>
           )}
 
-          {selectedVulnerabilityId && generateMutation.isPending && (
-            <div className="flex h-full min-h-[70vh] items-center justify-center">
-              <div className="animate-pulse-glow rounded-md border border-primary/40 px-4 py-3 text-sm text-primary">
-                Generating attack graph...
-              </div>
-            </div>
-          )}
-
-          {selectedVulnerabilityId && generateMutation.isError && (
-            <div className="flex h-full min-h-[70vh] flex-col items-center justify-center gap-3 p-6 text-center">
-              <p className="text-sm text-destructive">Failed to generate attack scenario.</p>
-              <button
-                type="button"
-                onClick={() => handleGenerate(selectedVulnerabilityId)}
-                className="rounded border border-destructive/60 px-3 py-1.5 text-sm"
-              >
-                Retry generation
-              </button>
-            </div>
-          )}
-
-          {selectedVulnerabilityId && !generateMutation.isPending && !generateMutation.isError && scenario && (
-            <div className="h-[78vh] w-full">
-              <ReactFlow<AttackNode, AttackEdge>
-                nodes={nodes}
-                edges={edges}
-                nodeTypes={nodeTypes}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onNodeClick={(_, node) => setSelectedStepNodeId(node.id)}
-                fitView
-                fitViewOptions={{ padding: 0.25 }}
-              >
-                <MiniMap
-                  pannable
-                  zoomable
-                  nodeStrokeColor={() => 'hsl(var(--primary))'}
-                  nodeColor={() => 'hsl(var(--card))'}
-                  maskColor="hsl(220 20% 7% / 0.7)"
-                />
-                <Controls />
-                <Background gap={20} size={1} color="hsl(var(--border))" />
-              </ReactFlow>
-            </div>
-          )}
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeClick={(_, n) => setSelectedStepNodeId(n.id)}
+            fitView
+            className="flex-1"
+          >
+            <Background color="#1e293b" gap={25} size={0.5} />
+            <Controls className="!bg-[#11141d] !border-white/10 !fill-primary" />
+          </ReactFlow>
         </section>
 
-        <aside className="col-span-3 rounded-lg border border-border bg-card/95 p-4">
-          <h2 className="text-sm font-semibold text-muted-foreground">Scenario</h2>
-          <p className="mt-1 text-sm font-semibold">{scenario?.scenario ?? 'No scenario generated yet.'}</p>
-
-          {scenario?.warnings.length ? (
-            <div className="mt-3 rounded border border-severity-medium/40 bg-severity-medium/10 p-2 text-xs text-severity-medium">
-              {scenario.warnings.join(' ')}
-            </div>
-          ) : null}
-
-          <div className="mt-5">
-            <h3 className="text-sm font-semibold text-muted-foreground">Selected Step</h3>
-            {!selectedStep ? (
-              <p className="mt-1 text-sm text-muted-foreground">Select a graph node to inspect details.</p>
-            ) : (
-              <div className="mt-2 rounded-md border border-border bg-secondary p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="font-mono text-xs text-primary">STEP {selectedStep.stepNumber}</p>
-                  <span className={`rounded border px-2 py-0.5 text-xs ${severityClasses[selectedStep.severity]}`}>
-                    {selectedStep.severity}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm font-semibold">{selectedStep.title}</p>
-                <p className="mt-1 font-mono text-xs text-primary">MITRE: {selectedStep.techniqueId}</p>
-                <p className="mt-2 text-sm text-muted-foreground">{selectedStep.description}</p>
+        {/* ── Right Panel (Intelligence Feed) ── */}
+        <aside className={`transition-all duration-1000 delay-100 border-l border-white/5 bg-[#0D1117] flex flex-col ${
+          selectedVulnerabilityId ? 'w-[380px] translate-x-0 opacity-100' : 'w-0 translate-x-full opacity-0'
+        }`}>
+          <div className="p-8 space-y-10 overflow-y-auto sidebar-scroll">
+            
+            {/* ── Tactical Scenario Section ── */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Tactical Scenario</h3>
               </div>
-            )}
-          </div>
+              <div className="p-5 rounded-lg bg-black/40 border border-white/5 relative overflow-hidden group">
+                <div className="absolute top-0 left-0 w-1 h-full bg-primary/20 group-hover:bg-primary transition-colors" />
+                {!scenario ? (
+                  <div className="space-y-2 animate-pulse">
+                    <div className="h-2 w-3/4 bg-white/5 rounded" />
+                    <div className="h-2 w-1/2 bg-white/5 rounded" />
+                    <p className="text-[9px] font-mono text-primary/40 mt-3">INITIALIZING_SIMULATION...</p>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-white/80 leading-relaxed font-medium">
+                    {scenario.scenario}
+                  </p>
+                )}
+              </div>
+            </section>
 
-          <div className="mt-5">
-            <h3 className="text-sm font-semibold text-muted-foreground">Recommendations</h3>
-            {!scenario?.recommendations?.length ? (
-              <p className="mt-1 text-sm text-muted-foreground">Recommendations will appear after generation.</p>
-            ) : (
-              <ul className="mt-2 space-y-2 text-sm text-foreground">
-                {scenario.recommendations.map((recommendation, index) => (
-                  <li key={`${recommendation}-${index}`} className="rounded border border-border bg-secondary p-2">
-                    {recommendation}
-                  </li>
-                ))}
-              </ul>
-            )}
+            {/* ── Node Telemetry Section ── */}
+            <section>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Node Telemetry</h3>
+              </div>
+              {selectedNode ? (
+                <div className="p-6 rounded-lg bg-primary/5 border border-primary/20 space-y-4 animate-in fade-in slide-in-from-right-4 duration-500">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-primary tracking-widest uppercase">NODE_STEP_{selectedNode.data.stepNumber}</span>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase ${severityMap[selectedNode.data.severity]?.cls}`}>
+                      {selectedNode.data.severity}
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-bold text-white uppercase tracking-tight leading-snug">{selectedNode.data.title}</h4>
+                  <div className="h-px bg-white/5 w-full" />
+                  <p className="text-[11px] text-slate-300 leading-relaxed">{selectedNode.data.description}</p>
+                </div>
+              ) : (
+                <div className="p-10 border border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center opacity-40">
+                  <div className="text-xl mb-2 text-muted-foreground">⌬</div>
+                  <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Awaiting_Selection</p>
+                </div>
+              )}
+            </section>
+
+            {/* ── Countermeasures Section ── */}
+            <section className="pb-10">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Countermeasures</h3>
+              </div>
+              {!scenario ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="h-12 w-full bg-white/2 rounded-lg border border-white/5 animate-pulse flex items-center px-4">
+                      <div className="h-2 w-full bg-white/5 rounded" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {scenario.recommendations.map((rec, i) => (
+                    <div key={i} className="flex gap-4 p-4 rounded-lg border border-white/5 bg-[#11141d] hover:border-primary/20 transition-all group">
+                      <span className="text-primary font-black text-[10px] opacity-40 group-hover:opacity-100 italic">0{i+1}</span>
+                      <p className="text-[11px] text-slate-300 leading-relaxed font-bold">{rec}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </div>
         </aside>
-      </div>
-    </main>
+      </main>
+    </div>
   )
 }

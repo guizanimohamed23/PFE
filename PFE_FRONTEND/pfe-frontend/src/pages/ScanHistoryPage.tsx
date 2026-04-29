@@ -1,161 +1,79 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { getScans } from '../api/scanApi'
-import { useAuth } from '../context/AuthContext'
+import type { ScanResponse } from '../types/scan'
 
 function formatDateTime(value: string): string {
-  if (!value) {
-    return 'N/A'
-  }
-
+  if (!value) return 'N/A'
   const parsed = new Date(value)
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString()
 }
 
-function stateBadgeClass(state: string): string {
-  if (state === 'completed') {
-    return 'border-severity-low/40 bg-severity-low/15 text-severity-low'
-  }
-
-  if (state === 'scanner_unusable') {
-    return 'border-severity-medium/40 bg-severity-medium/15 text-severity-medium'
-  }
-
-  return 'border-destructive/40 bg-destructive/15 text-destructive'
+function stateBadgeClass(state: ScanResponse['scanState']): string {
+  if (state === 'completed') return 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
+  if (state === 'scanner_unusable') return 'border-orange-500/40 text-orange-400 bg-orange-500/10'
+  return 'border-destructive/40 text-destructive bg-destructive/10'
 }
 
 export default function ScanHistoryPage() {
-  const { user } = useAuth()
-
   const scansQuery = useQuery({
-    queryKey: ['scans-history'],
-    queryFn: () => getScans(1, 50),
-    enabled: !user?.isGuest,
+    queryKey: ['scans'],
+    queryFn: getScans,
   })
 
-  if (user?.isGuest) {
-    return (
-      <main className="grid-bg min-h-screen bg-background p-4 text-foreground">
-        <div className="mx-auto w-full max-w-5xl space-y-4">
-          <header className="rounded-lg border border-border bg-card/95 p-4">
-            <h1 className="text-lg font-semibold">Scan History</h1>
-          </header>
-          <section className="rounded-lg border border-border bg-card/90 p-10 text-center">
-            <p className="text-base font-medium text-foreground">Access restricted</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Scan history is only available to registered users.
-            </p>
-            <div className="mt-6 flex justify-center gap-3">
-              <Link
-                to="/login"
-                className="rounded border border-border px-4 py-2 text-sm text-muted-foreground hover:border-primary hover:text-primary"
-              >
-                Log In
-              </Link>
-              <Link
-                to="/register"
-                className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-              >
-                Sign Up
-              </Link>
-            </div>
-          </section>
-        </div>
-      </main>
-    )
-  }
-
   return (
-    <main className="grid-bg min-h-screen bg-background p-4 text-foreground">
-      <div className="mx-auto w-full max-w-5xl space-y-4">
-        <header className="rounded-lg border border-border bg-card/95 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h1 className="text-lg font-semibold">Scan History</h1>
-              <p className="mt-1 text-sm text-muted-foreground">Review previous scans and open full details.</p>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <Link to="/scanner" className="rounded border border-border px-3 py-1.5 text-muted-foreground hover:border-primary hover:text-primary">
-                New Scan
-              </Link>
-              <Link to="/" className="rounded border border-border px-3 py-1.5 text-muted-foreground hover:border-primary hover:text-primary">
-                Attack Paths
-              </Link>
-            </div>
+    <div className="min-h-screen bg-[#0a0c10] p-10 font-sans text-slate-200 relative overflow-hidden">
+      <div className="grid-bg fixed inset-0 opacity-20 pointer-events-none" />
+      
+      <div className="max-w-6xl mx-auto space-y-6 relative z-10">
+        <header className="bg-[#11141d]/80 border border-white/5 p-8 rounded-lg flex justify-between items-center backdrop-blur-sm">
+          <div>
+            <h1 className="text-2xl font-bold text-white mb-1">Scan History</h1>
+            <p className="text-sm text-slate-500">Review previous scans and open full details.</p>
+          </div>
+          <div className="flex gap-2">
+            <Link to="/scanner" className="px-4 py-2 bg-white/5 border border-white/5 rounded text-xs font-semibold text-slate-400 hover:bg-white/10 transition-all">New Scan</Link>
+            <Link to="/" className="px-4 py-2 bg-white/5 border border-white/5 rounded text-xs font-semibold text-slate-400 hover:bg-white/10 transition-all">Attack Paths</Link>
           </div>
         </header>
 
-        {scansQuery.isLoading && (
-          <section className="rounded-lg border border-border bg-card/90 p-4">
-            <div className="animate-pulse space-y-2">
-              <div className="h-4 w-1/4 rounded bg-secondary" />
-              <div className="h-16 rounded bg-secondary" />
-              <div className="h-16 rounded bg-secondary" />
-            </div>
-          </section>
-        )}
-
-        {scansQuery.isError && (
-          <section className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm">
-            <p className="text-destructive">Unable to load scan history.</p>
-            <button
-              type="button"
-              onClick={() => scansQuery.refetch()}
-              className="mt-2 rounded border border-destructive/60 px-3 py-1.5 text-xs text-destructive"
-            >
-              Retry
-            </button>
-          </section>
-        )}
-
-        {!scansQuery.isLoading && !scansQuery.isError && (scansQuery.data?.length ?? 0) === 0 && (
-          <section className="rounded-lg border border-border bg-card/90 p-6 text-center text-muted-foreground">
-            No scans found yet. Start one from the scanner page.
-          </section>
-        )}
-
-        {!scansQuery.isLoading && !scansQuery.isError && (scansQuery.data?.length ?? 0) > 0 && (
-          <section className="overflow-hidden rounded-lg border border-border bg-card/90">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-left text-sm">
-                <thead className="bg-secondary text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3">Scan</th>
-                    <th className="px-4 py-3">Target</th>
-                    <th className="px-4 py-3">Created</th>
-                    <th className="px-4 py-3">State</th>
-                    <th className="px-4 py-3">Matched</th>
-                    <th className="px-4 py-3">Action</th>
+        <section className="bg-[#11141d]/80 border border-white/5 rounded-lg backdrop-blur-sm overflow-hidden shadow-2xl">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-white/5 text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-white/2">
+                  <th className="px-6 py-5">Scan</th>
+                  <th className="px-6 py-5">Target</th>
+                  <th className="px-6 py-5">Created</th>
+                  <th className="px-6 py-5 text-center">State</th>
+                  <th className="px-6 py-5 text-center">Matched</th>
+                  <th className="px-6 py-5 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {scansQuery.isLoading ? (
+                  <tr><td colSpan={6} className="px-6 py-10 text-center text-xs font-mono text-primary animate-pulse uppercase tracking-widest">Awaiting Data Stream...</td></tr>
+                ) : scansQuery.data?.map(scan => (
+                  <tr key={scan.id} className="hover:bg-white/2 transition-colors">
+                    <td className="px-6 py-5 font-mono text-xs text-primary font-bold">#{scan.id}</td>
+                    <td className="px-6 py-5 text-sm text-slate-300 max-w-xs truncate">{scan.targetUrl}</td>
+                    <td className="px-6 py-5 text-xs text-slate-500">{formatDateTime(scan.createdAt)}</td>
+                    <td className="px-6 py-5 text-center">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold border uppercase inline-block min-w-[120px] ${stateBadgeClass(scan.scanState)}`}>
+                        {scan.scanState}
+                      </span>
+                    </td>
+                    <td className="px-6 py-5 text-center font-bold text-slate-300 text-sm">{scan.scanMeta.matchedFindings}</td>
+                    <td className="px-6 py-5 text-right">
+                      <Link to={`/scans/${scan.id}`} className="text-xs font-bold text-primary hover:underline uppercase tracking-tighter">Open</Link>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {scansQuery.data?.map((scan) => (
-                    <tr key={scan.id} className="border-t border-border">
-                      <td className="px-4 py-3 font-mono text-xs text-primary">#{scan.id}</td>
-                      <td className="px-4 py-3">{scan.targetUrl || 'N/A'}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{formatDateTime(scan.createdAt)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded border px-2 py-0.5 text-xs font-medium ${stateBadgeClass(scan.scanState)}`}>
-                          {scan.scanState}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">{scan.scanMeta.matchedFindings}</td>
-                      <td className="px-4 py-3">
-                        <Link
-                          to={`/scans/${scan.id}`}
-                          className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:border-primary hover:text-primary"
-                        >
-                          Open
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
-    </main>
+    </div>
   )
 }

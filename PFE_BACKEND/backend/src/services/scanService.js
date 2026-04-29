@@ -125,26 +125,64 @@ const validateTargetUrl = async (urlString) => {
 // ── Helpers ─────────────────────────────────────────────────────
 const toScanKey = (targetUrl) => String(targetUrl || "").trim().toLowerCase();
 
-const PASSIVE_TIMEOUT_MS = 8000;
+const PASSIVE_TIMEOUT_MS = 12000;
+
+// Browser-like headers to avoid bot-protection rejections (Cloudflare, WAFs, etc.)
+const PASSIVE_REQUEST_HEADERS = {
+	"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+	"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+	"Accept-Language": "en-US,en;q=0.5",
+	"Accept-Encoding": "gzip, deflate, br",
+	"Connection": "keep-alive",
+	"Upgrade-Insecure-Requests": "1",
+};
+
+/**
+ * Fetch a URL with retry on transient network errors.
+ * Returns the axios response or throws on final failure.
+ */
+const fetchWithRetry = async (url, options, maxRetries = 2) => {
+	let lastError;
+	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		try {
+			return await axios.get(url, options);
+		} catch (err) {
+			lastError = err;
+			// Only retry on network-level errors (ECONNRESET, ETIMEDOUT, etc.)
+			const isRetryable = err.code && /ECONNRESET|ETIMEDOUT|ENOTFOUND|EAI_AGAIN/.test(err.code);
+			if (!isRetryable || attempt === maxRetries) break;
+			await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+		}
+	}
+	throw lastError;
+};
 
 const buildPassiveFindings = async (targetUrl) => {
 	const findings = [];
 
 	let rootResponse;
 	try {
-		rootResponse = await axios.get(targetUrl, {
+		rootResponse = await fetchWithRetry(targetUrl, {
 			timeout: PASSIVE_TIMEOUT_MS,
 			validateStatus: () => true,
 			maxRedirects: 5,
+			headers: PASSIVE_REQUEST_HEADERS,
 		});
 	} catch (_error) {
 		return findings;
 	}
 
-	// Do not turn upstream outage pages into misleading security findings.
-	// Heroku/edge 5xx responses often omit app headers and produce false positives.
+	// If the server is returning 5xx errors, flag it as a finding but continue
+	// analysing whatever headers/body we did receive — don't bail out entirely.
 	if (Number(rootResponse.status) >= 500) {
-		return findings;
+		findings.push({
+			cveId: null,
+			title: "Target Application Instability (5xx)",
+			description: `The application returned HTTP ${rootResponse.status} during passive analysis, indicating server-side errors or misconfigurations that may expose internal details.`,
+			severity: "medium",
+			evidence: `Target: ${targetUrl}\nHTTP Status: ${rootResponse.status}`,
+		});
+		// Still continue — headers are still worth inspecting even on 5xx
 	}
 
 	const headers = Object.fromEntries(
@@ -265,20 +303,69 @@ const buildPassiveFindings = async (targetUrl) => {
 		{ name: "Ruby on Rails", hint: cookies.includes("_session_id") && poweredBy.includes("Phusion") },
 	];
 
-	for (const rule of frameworkRules) {
+	// ── Body-Content Framework & SPA Fingerprinting ───────────────
+	const body = String(rootResponse.data || "");
+	const bodyLower = body.slice(0, 30000).toLowerCase();
+
+	const bodyFrameworkRules = [
+		{
+			name: "React SPA",
+			hint: ["data-reactroot", "react-dom", "__react_devtools", "_reactfiber", "window.__reactroot", "/static/js/main.", "react.production.min.js"]
+				.some((sig) => bodyLower.includes(sig)),
+		},
+		{
+			name: "Angular SPA",
+			// Angular bundles: main.*.js, polyfills.*.js, runtime.*.js  or ng-version attr
+			hint: ["ng-version", "ng-app", "<app-root", "[_nghost", "angular.min.js",
+					"polyfills.js", "runtime.js", "main.js", ".chunk.js",
+					"angular/core", "@angular", "ngsw-worker.js"]
+				.some((sig) => bodyLower.includes(sig)),
+		},
+		{
+			name: "Vue.js SPA",
+			hint: ["__vue__", "data-v-", "vue.min.js", "vue.js", "vue.runtime"]
+				.some((sig) => bodyLower.includes(sig)),
+		},
+		{
+			name: "PHP",
+			hint: !poweredBy.includes("PHP") && !cookies.includes("PHPSESSID") &&
+				["<?php", ".php", "phpmyadmin", "phpinfo"]
+					.some((sig) => bodyLower.includes(sig)),
+		},
+		{
+			name: "WordPress",
+			hint: ["wp-content", "wp-includes", "wordpress"]
+				.some((sig) => bodyLower.includes(sig)),
+		},
+		{
+			name: "jQuery",
+			hint: ["jquery.min.js", "jquery.js", "jquery-"].some((sig) => bodyLower.includes(sig)),
+		},
+		{
+			// Detect general SPA shell even without a specific framework signal
+			name: "Single-Page Application (SPA)",
+			hint:
+				// SPA shells: small HTML, lots of JS bundles, no meaningful server-rendered text
+				body.length < 5000 &&
+				(bodyLower.match(/src=["'][^"']*\.js["']/g) || []).length >= 3 &&
+				!bodyLower.includes("<p ") && !bodyLower.includes("<table"),
+		},
+	];
+
+	for (const rule of [...frameworkRules, ...bodyFrameworkRules]) {
 		if (rule.hint) {
 			findings.push({
 				cveId: null,
 				title: `Technology Detected: ${rule.name}`,
 				description: `Target identified as running ${rule.name}. Analysts should prioritize platform-specific vulnerabilities.`,
 				severity: "info",
-				evidence: `Source: Headers/Cookies Matching "${rule.name}"`,
+				evidence: `Source: Headers/Cookies/Body Matching "${rule.name}"`,
 			});
 		}
 	}
 
 	// ── Secret Scanning ───────────────────────────────────────────
-	const body = String(rootResponse.data || "");
+	// (body is already defined above)
 	const secretPatterns = [
 		{ name: "AWS API Key", regex: /AKIA[0-9A-Z]{16}/g, severity: "high" },
 		// Stricter: AWS secret keys are base64-like strings that appear adjacent to known key identifiers
@@ -314,13 +401,18 @@ const buildPassiveFindings = async (targetUrl) => {
 		"/api", "/api-docs", "/swagger", "/openapi.json", "/robots.txt",
 		"/.env", "/.git/config", "/package.json", "/composer.json"
 	];
-	for (const path of probePaths) {
+
+	// Run all probes in parallel with a short per-probe timeout (4s) to avoid
+	// blocking the passive scan for 100+ seconds on slow targets.
+	const PROBE_TIMEOUT_MS = 4000;
+	const probePromises = probePaths.map(async (path) => {
 		try {
 			const probeUrl = `${base.origin}${path}`;
 			const response = await axios.get(probeUrl, {
-				timeout: PASSIVE_TIMEOUT_MS,
+				timeout: PROBE_TIMEOUT_MS,
 				validateStatus: () => true,
 				maxRedirects: 2,
+				headers: PASSIVE_REQUEST_HEADERS,
 			});
 
 			if (response.status >= 200 && response.status < 300) {
@@ -336,7 +428,8 @@ const buildPassiveFindings = async (targetUrl) => {
 		} catch (_error) {
 			// Ignore probe failures
 		}
-	}
+	});
+	await Promise.allSettled(probePromises);
 
 	return findings;
 };
@@ -497,22 +590,24 @@ exports.create = async (payload, userId) => {
 
 		const normalization = scanNormalizationService.normalizeHexstrikeResultsDetailed(scannerOutput);
 		const normalizedFindings = normalization.findings;
-		const passiveFindings = await buildPassiveFindings(targetUrl);
+
+		let passiveFindings = [];
+		try {
+			passiveFindings = await buildPassiveFindings(targetUrl);
+			console.log(`[SCAN-PIPELINE] ✅ buildPassiveFindings returned ${passiveFindings.length} items for ${targetUrl}`);
+		} catch (passiveError) {
+			console.error(`[SCAN-PIPELINE] ❌ buildPassiveFindings failed:`, passiveError.message);
+		}
+
 		const combinedFindings = [...normalizedFindings, ...passiveFindings];
 		const allResults = await vulnerabilityMatcherService.createOrMatchFindings(combinedFindings);
 
-		const isScannerUnusable = scannerOutput.scannerState === "scanner_unusable";
-
-
+		const matchedCount = allResults.length;
 		const createdCount = allResults.filter((r) => r.matchedBy === "created").length;
 		const matchedExistingCount = allResults.filter((r) => r.matchedBy === "cveId" || r.matchedBy === "keyword").length;
-		const hasWarnings =
-			Array.isArray(scannerOutput?.metadata?.warningReasons) &&
-			scannerOutput.metadata.warningReasons.length > 0;
-		const scannerOutcome =
-			hasWarnings || scannerOutput.scannerState === "completed_with_warnings"
-				? "completed_with_warnings"
-				: "completed";
+		
+		const isScannerUnusable = scannerOutput.scannerState === "scanner_unusable";
+		const scannerOutcome = (matchedCount > 0) ? "completed" : (isScannerUnusable ? "failed" : "completed_with_warnings");
 		const resolvedScanState = isScannerUnusable ? "scanner_unusable" : "completed";
 
 		const scanMeta = {

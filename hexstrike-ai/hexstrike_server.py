@@ -622,6 +622,8 @@ class TechnologyStack(Enum):
     PHP = "php"
     PYTHON = "python"
     JAVA = "java"
+    TOMCAT = "tomcat"
+    EXPRESS = "express"
     DOTNET = "dotnet"
     WORDPRESS = "wordpress"
     DRUPAL = "drupal"
@@ -649,6 +651,7 @@ class TargetProfile:
     attack_surface_score: float = 0.0
     risk_level: str = "unknown"
     confidence_score: float = 0.0
+    is_spa: bool = False  # True when target is a Single-Page Application (React/Angular/Vue)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert TargetProfile to dictionary for JSON serialization"""
@@ -667,7 +670,8 @@ class TargetProfile:
             "endpoints": self.endpoints,
             "attack_surface_score": self.attack_surface_score,
             "risk_level": self.risk_level,
-            "confidence_score": self.confidence_score
+            "confidence_score": self.confidence_score,
+            "is_spa": self.is_spa,
         }
 
 @dataclass
@@ -980,10 +984,15 @@ class IntelligentDecisionEngine:
         if profile.target_type in [TargetType.WEB_APPLICATION, TargetType.API_ENDPOINT]:
             profile.ip_addresses = self._resolve_domain(target)
 
-        # Technology detection (basic heuristics)
-        if profile.target_type == TargetType.WEB_APPLICATION:
-            profile.technologies = self._detect_technologies(target)
-            profile.cms_type = self._detect_cms(target)
+        # Technology detection via real HTTP fingerprinting
+        if profile.target_type in [TargetType.WEB_APPLICATION, TargetType.API_ENDPOINT]:
+            http_profile = self._fingerprint_via_http(target)
+            profile.technologies = http_profile.get("technologies", [TechnologyStack.UNKNOWN])
+            profile.cms_type = http_profile.get("cms_type", None)
+            profile.is_spa = http_profile.get("is_spa", False)
+            # Carry detected security headers into the profile
+            if http_profile.get("security_headers"):
+                profile.security_headers.update(http_profile["security_headers"])
 
         # Calculate attack surface score
         profile.attack_surface_score = self._calculate_attack_surface(profile)
@@ -1038,37 +1047,166 @@ class IntelligentDecisionEngine:
             pass
         return []
 
-    def _detect_technologies(self, target: str) -> List[TechnologyStack]:
-        """Detect technologies using basic heuristics"""
+    # ── HTTP-Based Fingerprinting (replaces stub heuristics) ──────────────────
+
+    def _fingerprint_via_http(self, target: str) -> dict:
+        """
+        Perform a real HTTP request to fingerprint the target.
+        Returns a dict with keys: technologies, cms_type, is_spa, security_headers.
+        Falls back to URL-string heuristics if the request fails.
+        """
+        result = {
+            "technologies": [],
+            "cms_type": None,
+            "is_spa": False,
+            "security_headers": {},
+        }
+        try:
+            resp = requests.get(
+                target,
+                timeout=8,
+                allow_redirects=True,
+                verify=False,
+                headers={"User-Agent": "Mozilla/5.0 (HexStrike-Fingerprinter/1.0)"},
+            )
+            headers_lower = {k.lower(): v for k, v in resp.headers.items()}
+            body = resp.text or ""
+            cookies_raw = headers_lower.get("set-cookie", "").lower()
+            server = headers_lower.get("server", "")
+            powered_by = headers_lower.get("x-powered-by", "")
+            content_type = headers_lower.get("content-type", "")
+
+            # ── Security headers snapshot ──
+            for hdr in ["content-security-policy", "strict-transport-security",
+                        "x-frame-options", "x-content-type-options",
+                        "referrer-policy", "permissions-policy"]:
+                result["security_headers"][hdr] = headers_lower.get(hdr, "MISSING")
+
+            # ── Server / framework detection ──
+            tech_hints: List[TechnologyStack] = []
+
+            if any(t in server for t in ["Apache", "apache"]):
+                tech_hints.append(TechnologyStack.APACHE)
+            if any(t in server for t in ["nginx", "Nginx"]):
+                tech_hints.append(TechnologyStack.NGINX)
+            if any(t in server for t in ["Microsoft-IIS", "IIS"]):
+                tech_hints.append(TechnologyStack.IIS)
+            if any(t in server for t in ["Tomcat", "Apache-Coyote", "JBoss", "WebLogic"]):
+                tech_hints.append(TechnologyStack.JAVA)
+            if "PHP" in powered_by or "PHPSESSID" in cookies_raw:
+                tech_hints.append(TechnologyStack.PHP)
+            if any(t in powered_by for t in ["Express", "express"]) or "connect.sid" in cookies_raw:
+                tech_hints.append(TechnologyStack.NODEJS)
+            if any(t in powered_by for t in ["ASP.NET"]) or "asp.net_sessionid" in cookies_raw:
+                tech_hints.append(TechnologyStack.DOTNET)
+            if any(t in powered_by for t in ["Django", "Flask", "Werkzeug"]) or "csrftoken" in cookies_raw:
+                tech_hints.append(TechnologyStack.PYTHON)
+            if "jsessionid" in cookies_raw and TechnologyStack.JAVA not in tech_hints:
+                tech_hints.append(TechnologyStack.JAVA)
+
+            # ── Body content signals ──
+            body_lower = body[:30000].lower()  # Only scan first 30 KB
+            if "wp-content" in body_lower or "wp-includes" in body_lower:
+                tech_hints.append(TechnologyStack.WORDPRESS)
+                result["cms_type"] = "WordPress"
+            elif "/sites/default" in body_lower or "drupal" in body_lower:
+                result["cms_type"] = "Drupal"
+            elif "joomla" in body_lower or "/administrator" in body_lower:
+                result["cms_type"] = "Joomla"
+
+            # ── SPA Detection ──
+            spa_signals = [
+                # React
+                "__react_devtools", "react-dom", "data-reactroot", "_reactfiber",
+                "window.__reactroot", "/static/js/main.", "react.production.min.js",
+                # Angular (ng-version attr OR Angular CLI bundle filenames)
+                "ng-version", "ng-app", "angular.js", "angular.min.js",
+                "<app-root", "[_nghost",
+                "polyfills.js", "runtime.js", "ngsw-worker.js",
+                "angular/core", "@angular",
+                # Vue
+                "__vue__", "vue.js", "vue.min.js", "data-v-", "vue.runtime",
+                # Generic SPA markers
+                "window.__store", "window.__redux",
+            ]
+            is_spa = any(sig in body_lower for sig in spa_signals)
+
+            # Generic SPA shell: tiny HTML body with 3+ JS bundle <script> tags
+            # and no meaningful server-rendered paragraphs or tables
+            if not is_spa and "text/html" in content_type:
+                script_count = body_lower.count(".js')") + body_lower.count('.js")')
+                script_count += len(re.findall(r'src=["\'][^"\']*\.js["\']', body_lower))
+                if script_count >= 3 and len(body.strip()) < 5000 and "<p " not in body_lower and "<table" not in body_lower:
+                    is_spa = True
+
+            # Also detect SPA from content-type + tiny body (SPA shell)
+            if not is_spa and "text/html" in content_type and len(body.strip()) < 3000:
+                # If the HTML body is very small it's almost certainly a JS-rendered SPA
+                if "<script" in body_lower and ("<div id=" in body_lower or "<app-" in body_lower):
+                    is_spa = True
+
+            result["is_spa"] = is_spa
+
+            if is_spa:
+                # Detect which SPA framework
+                if any(s in body_lower for s in ["react-dom", "data-reactroot", "_reactfiber", "__react_devtools"]):
+                    tech_hints.append(TechnologyStack.REACT)
+                elif any(s in body_lower for s in ["ng-version", "<app-root", "[_nghost", "angular"]):
+                    tech_hints.append(TechnologyStack.ANGULAR)
+                elif any(s in body_lower for s in ["__vue__", "data-v-"]):
+                    tech_hints.append(TechnologyStack.VUE)
+
+            # ── URL-string fallback (catch obvious cases not in headers/body) ──
+            url_lower = target.lower()
+            if "wordpress" in url_lower or "wp-" in url_lower:
+                if TechnologyStack.WORDPRESS not in tech_hints:
+                    tech_hints.append(TechnologyStack.WORDPRESS)
+            if ".php" in url_lower and TechnologyStack.PHP not in tech_hints:
+                tech_hints.append(TechnologyStack.PHP)
+            if (".asp" in url_lower or ".aspx" in url_lower) and TechnologyStack.DOTNET not in tech_hints:
+                tech_hints.append(TechnologyStack.DOTNET)
+
+            result["technologies"] = tech_hints if tech_hints else [TechnologyStack.UNKNOWN]
+
+        except Exception:
+            # Network error – fall back to URL-only heuristics so we never crash
+            result["technologies"] = self._detect_technologies_fallback(target)
+            result["cms_type"] = self._detect_cms_fallback(target)
+
+        return result
+
+    def _detect_technologies_fallback(self, target: str) -> List[TechnologyStack]:
+        """URL-string-only technology detection used when HTTP request fails."""
         technologies = []
-
-        # This is a simplified version - in practice, you'd make HTTP requests
-        # and analyze headers, content, etc.
-
-        # For now, return some common technologies based on target patterns
-        if 'wordpress' in target.lower() or 'wp-' in target.lower():
+        url_lower = target.lower()
+        if 'wordpress' in url_lower or 'wp-' in url_lower:
             technologies.append(TechnologyStack.WORDPRESS)
-
-        if any(ext in target.lower() for ext in ['.php', 'php']):
+        if any(ext in url_lower for ext in ['.php', '/php']):
             technologies.append(TechnologyStack.PHP)
-
-        if any(ext in target.lower() for ext in ['.asp', '.aspx']):
+        if any(ext in url_lower for ext in ['.asp', '.aspx']):
             technologies.append(TechnologyStack.DOTNET)
-
         return technologies if technologies else [TechnologyStack.UNKNOWN]
 
-    def _detect_cms(self, target: str) -> Optional[str]:
-        """Detect CMS type"""
-        target_lower = target.lower()
-
-        if 'wordpress' in target_lower or 'wp-' in target_lower:
+    def _detect_cms_fallback(self, target: str) -> Optional[str]:
+        """URL-string-only CMS detection used when HTTP request fails."""
+        t = target.lower()
+        if 'wordpress' in t or 'wp-' in t:
             return "WordPress"
-        elif 'drupal' in target_lower:
+        if 'drupal' in t:
             return "Drupal"
-        elif 'joomla' in target_lower:
+        if 'joomla' in t:
             return "Joomla"
-
         return None
+
+    # ── Legacy stubs kept for any external callers ────────────────────────────
+
+    def _detect_technologies(self, target: str) -> List[TechnologyStack]:
+        """Deprecated: use _fingerprint_via_http instead. Kept for compatibility."""
+        return self._detect_technologies_fallback(target)
+
+    def _detect_cms(self, target: str) -> Optional[str]:
+        """Deprecated: use _fingerprint_via_http instead. Kept for compatibility."""
+        return self._detect_cms_fallback(target)
 
     def _calculate_attack_surface(self, profile: TargetProfile) -> float:
         """Calculate attack surface score based on profile"""
@@ -1168,6 +1306,73 @@ class IntelligentDecisionEngine:
                 selected_tools.append("nikto")
 
         return selected_tools
+
+    def enrich_profile(self, profile: TargetProfile, scan_results: Dict[str, Any]):
+        """Update target profile with high-fidelity metadata discovered during tool execution"""
+        tools_executed = scan_results.get("tools_executed", [])
+        findings = scan_results.get("findings", [])
+
+        # 1. Process Nmap findings for ports and services
+        for tool in tools_executed:
+            if tool.get("tool") == "nmap" and tool.get("stdout"):
+                stdout = tool.get("stdout")
+                for line in stdout.splitlines():
+                    # Pattern: 80/tcp open http
+                    port_match = re.match(r'(\d+)/\w+\s+open\s+(\S+)', line.strip())
+                    if port_match:
+                        port = int(port_match.group(1))
+                        service = port_match.group(2)
+                        if port not in profile.open_ports:
+                            profile.open_ports.append(port)
+                        profile.services[port] = service
+
+            # 2. Process HTTPX for technologies and headers
+            if tool.get("tool") == "httpx" and tool.get("stdout"):
+                stdout = tool.get("stdout")
+                # Look for technology markers in httpx output
+                for tech in TechnologyStack:
+                    if tech.value != "unknown" and tech.value.lower() in stdout.lower():
+                        if tech not in profile.technologies:
+                            profile.technologies.append(tech)
+                
+                # Basic security header extraction from httpx if -title -status-code -tech-detect was used
+                header_patterns = {
+                    "Content-Security-Policy": r"csp:\[(.*?)\]",
+                    "Strict-Transport-Security": r"hsts:\[(.*?)\]",
+                    "X-Frame-Options": r"x-frame-options:\[(.*?)\]",
+                    "Server": r"server:\[(.*?)\]"
+                }
+                for header, pattern in header_patterns.items():
+                    match = re.search(pattern, stdout, re.I)
+                    if match:
+                        profile.security_headers[header] = match.group(1)
+
+        # 3. Process Findings (heuristics and AI-generated info)
+        for finding in findings:
+            title = finding.get("title", "").lower()
+            evidence = finding.get("evidence", "").lower()
+            
+            # Extract technologies from disclosure vulns
+            if "technology detected" in title or "server header" in title:
+                for tech in TechnologyStack:
+                    if tech.value != "unknown" and tech.value.lower() in evidence:
+                        if tech not in profile.technologies:
+                            profile.technologies.append(tech)
+            
+            # Populate security headers from "Missing header" findings
+            if "missing" in title and "header" in title:
+                header_name = title.replace("missing", "").replace("header", "").strip().upper()
+                if header_name not in profile.security_headers:
+                    profile.security_headers[header_name] = "MISSING"
+
+        # 4. Final cleanup
+        if TechnologyStack.UNKNOWN in profile.technologies and len(profile.technologies) > 1:
+            profile.technologies.remove(TechnologyStack.UNKNOWN)
+        
+        # Update confidence score based on new data
+        profile.confidence_score = min(0.95, profile.confidence_score + (len(profile.open_ports) * 0.05) + (len(profile.technologies) * 0.1))
+        profile.attack_surface_score = self._calculate_attack_surface(profile)
+        profile.risk_level = self._determine_risk_level(profile)
 
     def optimize_parameters(self, tool: str, profile: TargetProfile, context: Dict[str, Any] = None) -> Dict[str, Any]:
         """Enhanced parameter optimization with advanced intelligence"""
@@ -10495,6 +10700,11 @@ def intelligent_smart_scan():
         # PERFORM ADVANCED ANALYSIS
         logger.info(f"🔍 Analyzing results for {target} with VulnerabilityAnalyzer...")
         findings = vulnerability_analyzer.analyze(scan_results)
+        
+        # ENRICH TARGET PROFILE with findings
+        scan_results["findings"] = [f.to_dict() for f in findings]
+        decision_engine.enrich_profile(profile, scan_results)
+        scan_results["target_profile"] = profile.to_dict()
 
         # Create execution summary
         successful_tools = [t for t in scan_results["tools_executed"] if t.get("success")]

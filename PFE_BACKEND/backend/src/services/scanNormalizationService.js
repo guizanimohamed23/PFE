@@ -260,6 +260,8 @@ const TOOL_NOISE_LINE_PATTERNS = [
   /deprecation/i,                                            // DeprecationWarning etc.
   /urllib3/i,                                                // urllib3 warnings (dependencies)
   /version.*conflict/i,                                      // Version conflicts
+  /feroxbuster.*options/i,                                   // feroxbuster help noise
+  /recursive scanning/i,                                     // directory tool noise
 ];
 
 const TOOL_VULN_PATTERNS = [
@@ -350,6 +352,11 @@ const THREAT_TITLES = [
   { kw: "header", title: "Security Header Misconfiguration" },
   { kw: "transport", title: "Insecure Transport Protocol" },
   { kw: "param", title: "Hidden Parameter Discovered" },
+  // High priority for directory discovery tools to prevent false RCE
+  { kw: "200", title: "Exposed Directory / File Discovery" },
+  { kw: "301", title: "Exposed Directory / File Discovery" },
+  { kw: "directory", title: "Exposed Directory / File Discovery" },
+  { kw: "path:", title: "Exposed Directory / File Discovery" },
 ];
 
 const hasPattern = (text, patterns) => {
@@ -702,29 +709,49 @@ const extractFindingsFromPlainText = (toolName, stdout, stderr) => {
       continue;
     }
     
-    // Require STRONG positive signals when only matching broad keywords like "env"
-    // This prevents false positives from words like "environment" in error messages
-    const hasPositiveSignal = hasStrongPositiveSignals(line) || hasPositiveFindingHint(line);
-    const isBroadKeywordOnly = (lower.includes("env") || lower.includes("config")) && 
-                               !lower.includes("disclosure") && 
-                               !lower.includes("exposed") &&
-                               !lower.includes("leaked") &&
-                               !lower.includes("file");
+    // De-noising for Directory Discovery tools (feroxbuster, gobuster, dirsearch, ffuf)
+    const isDirTool = ["feroxbuster", "gobuster", "dirsearch", "ffuf"].includes(toolName.toLowerCase());
     
-    if (isBroadKeywordOnly && !hasPositiveSignal) {
-      continue; // Skip broad keywords without positive signals
-    }
+    // If it's a directory tool and the line looks like a simple path discovery (200/301)
+    // then map it to "Directory Discovery" instead of letting it hit "RCE" or "Injection" keywords.
+    let title = "";
+    let severity = "";
+    
+    if (isDirTool && (lower.includes(" 200 ") || lower.includes(" 301 ") || lower.includes(" 302 "))) {
+      title = `Exposed Directory / File: ${line.trim().substring(0, 50)}`;
+      severity = "info";
+    } else {
+      // Require STRONG positive signals when only matching broad keywords like "env"
+      // This prevents false positives from words like "environment" in error messages
+      const hasPositiveSignal = hasStrongPositiveSignals(line) || hasPositiveFindingHint(line);
+      const isBroadKeywordOnly = (lower.includes("env") || lower.includes("config")) && 
+                                 !lower.includes("disclosure") && 
+                                 !lower.includes("exposed") &&
+                                 !lower.includes("leaked") &&
+                                 !lower.includes("file");
+      
+      if (isBroadKeywordOnly && !hasPositiveSignal) {
+        continue; // Skip broad keywords without positive signals
+      }
 
-    const conciseTitle = line.length > 96 ? `${line.substring(0, 96)}...` : line;
-    const defaultTitle = `${toolName}: ${conciseTitle}`;
-    const title = getThreatTitle(line, defaultTitle, toolName);
+      // If it's a directory tool matching "command" or "rce", double check it's not just part of the tool name/headers
+      if (isDirTool && (lower.includes("command") || lower.includes("rce")) && !hasStrongPositiveSignals(line)) {
+        title = `Exposed Directory / File: ${line.trim().substring(0, 50)}`;
+        severity = "info";
+      } else {
+        const conciseTitle = line.length > 96 ? `${line.substring(0, 96)}...` : line;
+        const defaultTitle = `${toolName}: ${conciseTitle}`;
+        title = getThreatTitle(line, defaultTitle, toolName);
+        severity = inferSeverityFromText(`${line}\n${combined}`);
+      }
+    }
 
     findings.push({
       tool: toolName, 
       cveId: null,
       title,
       description: `Finding from ${toolName} plain text output.`,
-      severity: inferSeverityFromText(combined), 
+      severity, 
       evidence: line.substring(0, 500),
     });
 
